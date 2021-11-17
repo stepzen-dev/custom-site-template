@@ -4,6 +4,7 @@ import Link from "next/link";
 import logo from "../public/light-blue.png";
 import styles from "../styles/Home.module.css";
 import useSWR from "swr";
+import { GetServerSideProps } from "next";
 
 // fetcher function to enable use of SWR
 const fetcher = async (url) => {
