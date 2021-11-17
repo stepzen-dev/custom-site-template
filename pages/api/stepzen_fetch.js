@@ -1,23 +1,15 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 
-export default async function getData(req, res) {
+function usernameVariableMassage() {
   // Environment variable massaging. Much of the logic borrowed from https://github.com/cassidoo/link-in-bio-template
-  let envVars = Object.entries(process.env).filter((key) =>
-    key[0].startsWith("NEXT_")
-  );
-
   const username_to_idx = Object.entries(process.env).filter((key) =>
     key[0].startsWith("NEXT_DEVTO_USERNAME")
   );
   const username = username_to_idx[0][1];
-  const nameIndex = envVars.findIndex(
-    (val) => val[0] === "NEXT_DEVTO_USERNAME"
-  );
-
-  if (nameIndex !== -1) {
-    envVars.splice(nameIndex, 1);
-  }
-
+  return username;
+}
+export default async function getData(req, res) {
+  let username = usernameVariableMassage();
   let github_token = process.env.NEXT_GITHUB_TOKEN;
   let twitter_bearerToken = process.env.NEXT_TWITTER_BEARER_TOKEN;
 
