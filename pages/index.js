@@ -1,31 +1,83 @@
 import Head from "next/head";
-import Image from "next/image";
-import Link from "next/link";
-import logo from "../public/light-blue.png";
 import styles from "../styles/Home.module.css";
-import useSWR from "swr";
 
-// fetcher function to enable use of SWR
-const fetcher = async (url) => {
-  const res = await fetch(url);
-  const data = await res.json();
-  if (res.status !== 200) {
-    throw new Error(data.message);
-  }
-  return data;
-};
+function usernameVariableMassage() {
+  // Environment variable massaging. Much of the logic borrowed from https://github.com/cassidoo/link-in-bio-template
+  const username_to_idx = Object.entries(process.env).filter((key) =>
+    key[0].startsWith("NEXT_DEVTO_USERNAME")
+  );
+  const username = username_to_idx[0][1];
+  return username;
+}
 
-export default function Home() {
-  const { data, error } = useSWR("/api/stepzen_fetch", fetcher);
+export async function getServerSideProps(context) {
+  let username = usernameVariableMassage();
+  let github_token = process.env.NEXT_GITHUB_TOKEN;
+  let twitter_bearerToken = process.env.NEXT_TWITTER_BEARER_TOKEN;
 
-  if (error) return <div>{error.message}</div>;
-  if (!data) return <div>Loading...</div>;
+  //Here we retrieve data from 3 different sources with one query, woven together in a StepZen layer accessible at
+  const response = await fetch(
+    "https://graphql1f.steprz.net/api/1fec739d90f6028c74a6f19855c34277/__graphql",
 
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        query: `query MyQuery ($github_token: Secret! $twitter_bearerToken: Secret!, $username: String! ) {
+          devto_getArticles(username: $username, top: 3) {
+            title
+            published_at
+            user {
+              github_details(github_token: $github_token) {
+                pinnedItems(first: 3) {
+                  nodes {
+                    ... on Github_Repository {
+                      id
+                      name
+                      description
+                    
+                    }
+                  }
+                }
+              }
+          
+              twitter_details(
+                twitter_bearerToken: $twitter_bearerToken
+              ) {
+                pinned_tweet(
+                  twitter_bearerToken: $twitter_bearerToken
+                ) {
+                  text
+                }
+              }
+              github_username
+              username
+              twitter_username
+            }
+          }
+        } 
+        `,
+        variables: {
+          github_token: github_token,
+          twitter_bearerToken: twitter_bearerToken,
+          username: username,
+        },
+      }),
+    }
+  );
+
+  let data = await response.json();
+
+  return { props: data };
+}
+
+export default function Home({ data }) {
   //page to render if tweet fetch goes awry
-  if (
-    data.data.data.devto_getArticles[0].user.twitter_details.pinned_tweet ===
-    null
-  ) {
+  if (data.devto_getArticles[0].user.twitter_details.pinned_tweet === null) {
     return (
       <div className={styles.container}>
         <Head>
@@ -37,23 +89,22 @@ export default function Home() {
         <main className={styles.main}>
           <h1 className={styles.title}>
             {" "}
-            {data.data.data.devto_getArticles[0].user.username}&#39;s custom
-            portfolio
+            {data.devto_getArticles[0].user.username}&#39;s custom portfolio
           </h1>
 
           <div className={styles.grid}>
             <a
-              href={`https://dev.to/${data.data.data.devto_getArticles[0].user.username}`}
+              href={`https://dev.to/${data.devto_getArticles[0].user.username}`}
               className={styles.card}
             >
               <h2>Top 3 DEV.to articles &rarr;</h2>
-              <p> - {data.data.data.devto_getArticles[0].title} </p>
-              <p> - {data.data.data.devto_getArticles[1].title} </p>
-              <p> - {data.data.data.devto_getArticles[2].title} </p>
+              <p> - {data.devto_getArticles[0].title} </p>
+              <p> - {data.devto_getArticles[1].title} </p>
+              <p> - {data.devto_getArticles[2].title} </p>
             </a>
 
             <a
-              href={`https://github.com/${data.data.data.devto_getArticles[0].user.github_username}`}
+              href={`https://github.com/${data.devto_getArticles[0].user.github_username}`}
               passHref
               className={styles.card}
             >
@@ -61,34 +112,34 @@ export default function Home() {
               <p>
                 Name:{" "}
                 {
-                  data.data.data.devto_getArticles[0].user.github_details
-                    .pinnedItems.nodes[0].name
+                  data.devto_getArticles[0].user.github_details.pinnedItems
+                    .nodes[0].name
                 }
                 Description:{" "}
                 {
-                  data.data.data.devto_getArticles[0].user.github_details
-                    .pinnedItems.nodes[0].description
+                  data.devto_getArticles[0].user.github_details.pinnedItems
+                    .nodes[0].description
                 }{" "}
               </p>
               <p>
                 {" "}
                 Name:{" "}
                 {
-                  data.data.data.devto_getArticles[0].user.github_details
-                    .pinnedItems.nodes[1].name
+                  data.devto_getArticles[0].user.github_details.pinnedItems
+                    .nodes[1].name
                 }
               </p>
               <p>
                 Description:{" "}
                 {
-                  data.data.data.devto_getArticles[0].user.github_details
-                    .pinnedItems.nodes[1].description
+                  data.devto_getArticles[0].user.github_details.pinnedItems
+                    .nodes[1].description
                 }
               </p>
             </a>
 
             <a
-              href={`https://twitter.com/${data.data.data.devto_getArticles[0].user.twitter_username}`}
+              href={`https://twitter.com/${data.devto_getArticles[0].user.twitter_username}`}
               className={styles.card}
             >
               <h2>Pinned Tweet &rarr;</h2>
@@ -107,8 +158,8 @@ export default function Home() {
 
     //page to render if github fetch goes awry
   } else if (
-    data.data.data.devto_getArticles[0].user.github_details.pinnedItems.nodes[0]
-      .name === null
+    data.devto_getArticles[0].user.github_details.pinnedItems.nodes[0].name ===
+    null
   ) {
     return (
       <div className={styles.container}>
@@ -121,23 +172,22 @@ export default function Home() {
         <main className={styles.main}>
           <h1 className={styles.title}>
             {" "}
-            {data.data.data.devto_getArticles[0].user.username}&#39;s custom
-            portfolio
+            {data.devto_getArticles[0].user.username}&#39;s custom portfolio
           </h1>
 
           <div className={styles.grid}>
             <a
-              href={`https://dev.to/${data.data.data.devto_getArticles[0].user.username}`}
+              href={`https://dev.to/${data.devto_getArticles[0].user.username}`}
               className={styles.card}
             >
               <h2>Top 3 DEV.to articles &rarr;</h2>
-              <p> - {data.data.data.devto_getArticles[0].title} </p>
-              <p> - {data.data.data.devto_getArticles[1].title} </p>
-              <p> - {data.data.data.devto_getArticles[2].title} </p>
+              <p> - {data.devto_getArticles[0].title} </p>
+              <p> - {data.devto_getArticles[1].title} </p>
+              <p> - {data.devto_getArticles[2].title} </p>
             </a>
 
             <a
-              href={`https://github.com/${data.data.data.devto_getArticles[0].user.github_username}`}
+              href={`https://github.com/${data.devto_getArticles[0].user.github_username}`}
               passHref
               className={styles.card}
             >
@@ -146,15 +196,15 @@ export default function Home() {
             </a>
 
             <a
-              href={`https://twitter.com/${data.data.data.devto_getArticles[0].user.twitter_username}`}
+              href={`https://twitter.com/${data.devto_getArticles[0].user.twitter_username}`}
               className={styles.card}
             >
               <h2>Pinned Tweet &rarr;</h2>
               <p>
                 {" "}
                 {
-                  data.data.data.devto_getArticles[0].user.twitter_details
-                    .pinned_tweet.text
+                  data.devto_getArticles[0].user.twitter_details.pinned_tweet
+                    .text
                 }
               </p>
             </a>
@@ -171,7 +221,7 @@ export default function Home() {
   }
 
   //page to render if devto fetch goes awry
-  if (data.data.data.devto_getArticles[0].user === undefined) {
+  if (data.devto_getArticles[0].user === undefined) {
     return <div>No devto user found under that name</div>;
 
     //page to render when things go well
@@ -187,23 +237,22 @@ export default function Home() {
         <main className={styles.main}>
           <h1 className={styles.title}>
             {" "}
-            {data.data.data.devto_getArticles[0].user.username}&#39;s custom
-            portfolio
+            {data.devto_getArticles[0].user.username}&#39;s custom portfolio
           </h1>
 
           <div className={styles.grid}>
             <a
-              href={`https://dev.to/${data.data.data.devto_getArticles[0].user.username}`}
+              href={`https://dev.to/${data.devto_getArticles[0].user.username}`}
               className={styles.card}
             >
               <h2>Top 3 DEV.to articles &rarr;</h2>
-              <p> - {data.data.data.devto_getArticles[0].title} </p>
-              <p> - {data.data.data.devto_getArticles[1].title} </p>
-              <p> - {data.data.data.devto_getArticles[2].title} </p>
+              <p> - {data.devto_getArticles[0].title} </p>
+              <p> - {data.devto_getArticles[1].title} </p>
+              <p> - {data.devto_getArticles[2].title} </p>
             </a>
 
             <a
-              href={`https://github.com/${data.data.data.devto_getArticles[0].user.github_username}`}
+              href={`https://github.com/${data.devto_getArticles[0].user.github_username}`}
               passHref
               className={styles.card}
             >
@@ -211,42 +260,42 @@ export default function Home() {
               <p>
                 Name:{" "}
                 {
-                  data.data.data.devto_getArticles[0].user.github_details
-                    .pinnedItems.nodes[0].name
+                  data.devto_getArticles[0].user.github_details.pinnedItems
+                    .nodes[0].name
                 }
                 Description:{" "}
                 {
-                  data.data.data.devto_getArticles[0].user.github_details
-                    .pinnedItems.nodes[0].description
+                  data.devto_getArticles[0].user.github_details.pinnedItems
+                    .nodes[0].description
                 }{" "}
               </p>
               <p>
                 {" "}
                 Name:{" "}
                 {
-                  data.data.data.devto_getArticles[0].user.github_details
-                    .pinnedItems.nodes[1].name
+                  data.devto_getArticles[0].user.github_details.pinnedItems
+                    .nodes[1].name
                 }
               </p>
               <p>
                 Description:{" "}
                 {
-                  data.data.data.devto_getArticles[0].user.github_details
-                    .pinnedItems.nodes[1].description
+                  data.devto_getArticles[0].user.github_details.pinnedItems
+                    .nodes[1].description
                 }
               </p>
             </a>
 
             <a
-              href={`https://twitter.com/${data.data.data.devto_getArticles[0].user.twitter_username}`}
+              href={`https://twitter.com/${data.devto_getArticles[0].user.twitter_username}`}
               className={styles.card}
             >
               <h2>Pinned Tweet &rarr;</h2>
               <p>
                 {" "}
                 {
-                  data.data.data.devto_getArticles[0].user.twitter_details
-                    .pinned_tweet.text
+                  data.devto_getArticles[0].user.twitter_details.pinned_tweet
+                    .text
                 }
               </p>
             </a>
