@@ -108,7 +108,7 @@ export default function Home({ data }) {
               ))}
           </a>
 
-          {data.devto_getArticles[0].user?.github_details?.login && (
+          {/* {data.devto_getArticles[0].user?.github_details?.login && (
             <a
               href={`https://github.com/${data.devto_getArticles[0].user.github_details.login}`}
               passHref
@@ -143,7 +143,7 @@ export default function Home({ data }) {
                   }
                 </p>
               </a>
-            )}
+            )} */}
         </div>
         <p className={styles.sub_headline}>
           powered by <a href="https://stepzen.com/">StepZen</a> and{" "}
