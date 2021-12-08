@@ -1,17 +1,8 @@
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 
-function usernameVariableMassage() {
-  // Environment variable massaging. Much of the logic borrowed from https://github.com/cassidoo/link-in-bio-template
-  const username_to_idx = Object.entries(process.env).filter((key) =>
-    key[0].startsWith("NEXT_DEVTO_USERNAME")
-  );
-  const username = username_to_idx[0][1];
-  return username;
-}
-
 export async function getServerSideProps(context) {
-  let username = usernameVariableMassage();
+  let username = process.env.NEXT_DEVTO_USERNAME;
   let github_token = process.env.NEXT_GITHUB_TOKEN;
   let twitter_bearerToken = process.env.NEXT_TWITTER_BEARER_TOKEN;
 
